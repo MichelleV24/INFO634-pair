@@ -1,0 +1,216 @@
+---
+title: "Pair assessment INFO634"
+author: "Michelle Visscher"
+date: "2022-08-29"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### Question 1:
+Data pre-processing: consolidate the two body height and shoe/foot size data files in one data file containing relevant attributes. The data may contain some imperfection that requires some data cleansing activities. Please describe these activities and provide necessary justifications and assumptions in the report.
+
+```{r}
+library(tidyverse)
+foot01 <- read_csv("foot01.csv")
+library(readxl)
+footlengthandbodyheightpdf <- read_excel("footlengthandbodyheightpdf.xlsx")
+
+footlength1 <- foot01
+footlength2 <- footlengthandbodyheightpdf
+```
+
+Next we need to clean the data frame:
+1. remove N/A values in the PDF file 
+2. rename column names
+3. remove student column and time column (unnecessary)
+
+```{r}
+footlength2.1<-drop_na(footlength2)
+colnames(footlength2.1)<-c("student","gender","foot_length", "height")
+colnames(footlength1)<-c("time", "gender", "height", "shoe_size")
+footlength2.1$student<-NULL
+footlength1$time<-NULL
+```
+### Cleaning the Data:
+Removing any variables with a height less than 20cm
+Removing row 68 - outlier with height 364.00, shoe size 88
+
+```{r}
+as.data.frame(footlength1)
+class(footlength1)<-"data.frame"
+footlength1<-footlength1[!footlength1$height<20,]
+footlength1<-footlength1[!footlength1$height>300,]
+summary(footlength1)
+```
+
+
+Converting shoe size to foot length for dataset footlength1
+We used the merge function to merge the datasets for FL to EU size and Foot length 1. 
+During this process, some variables were excluded from the data set as the foot length 1 data set included shoe sizes not included in the official FL to EU size conversion. Due to this, the cases with a shoe size greater than 47 and any half shoe sizes were excluded from the data set.
+
+```{r}
+library(readr)
+FLtoEUSize <- read_csv("FLtoEUSize.csv")
+summary(FLtoEUSize)
+colnames(FLtoEUSize)<-c("shoe_size","foot_length")
+summary(footlength1)
+footlength1$foot_length<-""
+mergeddataFL1<-merge(footlength1,FLtoEUSize, by.x="shoe_size", by.y="shoe_size")
+```
+
+cleaning the merged data set:
+
+```{r}
+mergeddataFL1$foot_length.x<-NULL
+mergeddataFL1[mergeddataFL1$gender == "woman", 2] <- "F"
+mergeddataFL1[mergeddataFL1$gender == "man", 2] <- "M"
+
+mergeddataFL1$foot_length.y <- paste(paste(substr(mergeddataFL1$foot_length.y, 1,2),'.', sep = ""), substr(mergeddataFL1$foot_length.y, 4,5), sep = "")
+mergeddataFL1                
+```
+
+Merging the two data sets footlength2.1 and mergeddataFL1
+
+```{r}
+mergeddataFL1$shoe_size<-NULL
+colnames(mergeddataFL1)<-c("gender","height","foot_length")
+mergeddataFL1$foot_length<-as.double(mergeddataFL1$foot_length)
+
+footlength_height_comb<-rbind(mergeddataFL1,footlength2.1)
+footlength_height_comb #our final combined dataset
+```
+
+#### Question 2: 
+What is the correlation between body height and foot size, and explain your results.
+
+```{r}
+cor(footlength_height_comb$height, footlength_height_comb$foot_length)
+cor.test(footlength_height_comb$height, footlength_height_comb$foot_length)
+```
+
+From the correlation coefficient test result of 0.693 (3 dp), there is a evidence to suggest there is a positive relationship between the variables height and foot length for the sample set provided. This suggests that as body height increases so too does foot size.
+
+### Question 3: 
+
+Create a histogram based on foot size values. Requirements:
+i) Figure title: “Foot Size Distribution”
+ii) X-axis is labelled with “Foot Size in CM” or “Foot Size in EU Size” 
+iii) Y-axis is labelled with “Frequency”
+iv) The bins should be coloured with hex colour code “#42f5b3”
+
+```{r}
+library(ggplot2)
+graphQ3 <- ggplot(footlength_height_comb, aes(x=foot_length))
+graph1 <-graphQ3+geom_histogram(fill= "#42f5b3" ) +
+  labs(title = "Foot Size Distribution",
+       x = "Foot Size in CM",
+       y = "Frequency")
+
+graph1
+
+```
+### Question 4: 
+
+Enhance the figure generated in 3)
+i) Create a facet chart based on genders
+
+```{r}
+graph1 + facet_grid(gender~.,)
+```
+ii) Provide descriptive descriptions and insights of the visualisations, not less than 200 words.
+```{r}
+count(footlength_height_comb, gender)
+```
+
+
+The graph above of foot size distribution as faceted by gender shows a general trend of women (F) having a smaller foot size than men (M). The range of foot sizes is larger in women than in men, notably the largest smallest foot size in women is 20.31cm, while the largest foot size in women is 35.01cm. This data point of a foot size of 35.01cm for a woman looks to be an outlier, and it may be the case that this data point is incorrectly measured. The range in foot sizes for men is less than the range for women, with the minimum foot size for men being 24.25cm and the largest foot size at 30.21. The overall distribution for foot size distribution in men is approximately normally distributed, whereas the overall distribution for foot size in women is approximately right skewed (inclusive of the outlier). We suspect that by excluding the outlier in the women data set, we would see a more normally distributed sample. 
+We also note that there is a larger sample size for women than for men, with 44 samples taken for men and 97 samples taken for women. If we have a larger data set of samples, we expect our data set to be more equally (normally) distributed. 
+
+### Question 5:
+Create linear regression models of human body heights and shoe sizes for the entire population, female population and male population respectively. Generate plots of the models over the samples. Justify comprehensively your answer using the model summaries.
+
+Linear regression model of human body heights and foot sizes for the entire population:
+```{r}
+graphQ5<-ggplot(data=footlength_height_comb, aes(x=height,y=foot_length)) +
+  geom_point(size=3, aes(colour = "Red"), alpha = 0.5) +
+  stat_smooth(method=lm, se = F)
+graphQ5
+```
+
+```{r}
+LMQ5<-lm(formula = footlength_height_comb$height~footlength_height_comb$foot_length)
+LMQ5
+summary(LMQ5)
+```
+
+Plotting linear regression models of human body heights and shoe sizes for the entire population, color separated into female sample population 
+and male sample population respectively.
+
+```{r}
+graphQ5.1<-ggplot(data=footlength_height_comb, aes(x=height,y=foot_length)) +
+  geom_point(size=3, aes(colour = gender), alpha = 0.5) +
+  stat_smooth(method=lm, se = F)
+graphQ5.1
+```
+
+```{r}
+library(tidyverse)
+female<-footlength_height_comb%>%
+  filter(gender == "F")
+
+femaleplot<-ggplot(data=female, aes(x=height,y=foot_length)) +
+  geom_point(size=3, aes(colour = "Red"), alpha = 0.5) +
+  stat_smooth(method=lm, se = F)
+femaleplot
+
+LMQ5female<-lm(formula = female$height~female$foot_length)
+LMQ5female
+summary(LMQ5female)
+```
+
+```{r}
+library(tidyverse)
+male<-footlength_height_comb%>%
+  filter(gender == "M")
+
+maleplot<-ggplot(data=male, aes(x=height,y=foot_length)) +
+  geom_point(size=3, aes(colour = "Red"), alpha = 0.5) +
+  stat_smooth(method=lm, se = F)
+maleplot
+
+LMQ5male<-lm(formula = male$height~male$foot_length)
+LMQ5male
+summary(LMQ5male)
+
+```
+
+Based on the above linear regression models for body height and foot size in the sample population, we reject the null hypothesis that there is no relationship between the variables body height and foot size within our sample population. The p value of < 2.2e-16 being below alpha = 0.05, suggests our finding is statistically significant. This is accompanied with a large F- statistic of 128.2 on 1 and 139 DF. The same holds true when we look at body heights and foot size based on gender. For female body height and foot size, we can also see a statistically significant relationship between the two variables, with a p value of 1.957e-05. For male body height and foot size, our p value of 7.972e-07 is also low, and statistically significant. Our sample population model suggests that for a one unit increase in height there is a 3.107 increase in foot size. Height explains 48% of the variability in foot size.
+
+### Question 6:
+
+Based on the results from 5) above, analyse the residuals to determine if the assumptions underlying your regression analysis are valid. You need to provide a visualisation for this purpose and justify your answer.
+
+Plotting the residuals:
+```{r}
+LMQ5$residual
+
+footlength_height_comb$residual<-LMQ5$residual
+
+ggplot(data=footlength_height_comb, aes(x=height,y=residual))+
+  geom_point()+
+  geom_hline(yintercept = 2*sd(LMQ5$residual), colour = "blue")+
+  geom_hline(yintercept = -2*sd(LMQ5$residual), colour = "blue")
+
+```
+
+Based on our analysis of the residuals, the majority of the data does fall between +-2 Standard Deviations of the mean, however the data does not meet the assumption of linearity in that not all the residuals are distributed within +- 2 Standard Deviations. 
+
+
+
+
