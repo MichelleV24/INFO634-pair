@@ -1,6 +1,6 @@
 ---
 title: "Pair assessment INFO634"
-author: "Michelle Visscher"
+author: "Michelle Visscher and Kenneth Rosal 54668165"
 date: "2022-08-29"
 output:
   html_document: default
